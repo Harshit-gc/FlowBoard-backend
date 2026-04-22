@@ -6,7 +6,7 @@
 
     <modelVersion>4.0.0</modelVersion>
 
-    <!-- ── Parent: Spring Boot BOM (Bill of Materials) ── -->
+    <!-- Spring Boot Parent -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
@@ -14,43 +14,44 @@
         <relativePath/>
     </parent>
 
-    <!-- ── Project Identity ── -->
+    <!-- Project Identity -->
     <groupId>com.flowboard</groupId>
     <artifactId>flowboard-backend</artifactId>
     <version>1.0.0-SNAPSHOT</version>
-    <packaging>pom</packaging>        <!-- MUST be "pom" for parent -->
+    <packaging>pom</packaging>
     <name>FlowBoard Backend</name>
     <description>FlowBoard Task Management Platform — Parent POM</description>
 
-    <!-- ── Child Modules (we'll create these folders next) ── -->
+    <!-- Child Modules -->
     <modules>
-        <module>auth-gateway-service</module>
+        <module>auth-service</module>
+        <!-- <module>workspace-board-service</module> -->
+        <!-- <module>task-service</module>             -->
+        <!-- <module>collaboration-service</module>    -->
+        <!-- <module>notification-service</module>     -->
     </modules>
 
-    <!-- ── Global Java Version ── -->
+    <!-- Global Properties -->
     <properties>
         <java.version>17</java.version>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <!-- Dependency versions — change once here, applies to all services -->
-        <jjwt.version>0.11.5</jjwt.version>
         <lombok.version>1.18.30</lombok.version>
+        <jjwt.version>0.11.5</jjwt.version>
         <springdoc.version>2.3.0</springdoc.version>
         <modelmapper.version>3.2.0</modelmapper.version>
+        <mysql.version>8.3.0</mysql.version>
     </properties>
 
-    <!-- ── Shared Dependencies (every service inherits these) ── -->
+    <!-- Shared Dependencies — auto inherited by every service -->
     <dependencies>
-        <!-- Lombok — @Data, @Builder, @Slf4j etc. -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <version>${lombok.version}</version>
-            <scope>provided</scope>
+            <optional>true</optional>
         </dependency>
-
-        <!-- Spring Boot Testing -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
@@ -58,55 +59,18 @@
         </dependency>
     </dependencies>
 
-    <!-- ── Managed Dependencies (services OPT IN, no version needed) ── -->
+    <!-- dependencyManagement — ONLY third-party libs needing version pinning -->
     <dependencyManagement>
         <dependencies>
-
-            <!-- Spring Boot Starters -->
-            <dependency>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-starter-web</artifactId>
-                <version>${project.parent.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-starter-data-jpa</artifactId>
-                <version>${project.parent.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-starter-security</artifactId>
-                <version>${project.parent.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-starter-validation</artifactId>
-                <version>${project.parent.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-starter-amqp</artifactId>
-                <version>${project.parent.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-starter-websocket</artifactId>
-                <version>${project.parent.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-starter-mail</artifactId>
-                <version>${project.parent.version}</version>
-            </dependency>
 
             <!-- MySQL Driver -->
             <dependency>
                 <groupId>com.mysql</groupId>
                 <artifactId>mysql-connector-j</artifactId>
-                <version>8.3.0</version>
+                <version>${mysql.version}</version>
             </dependency>
 
-            <!-- JWT (JJWT) -->
+            <!-- JWT -->
             <dependency>
                 <groupId>io.jsonwebtoken</groupId>
                 <artifactId>jjwt-api</artifactId>
@@ -125,14 +89,14 @@
                 <scope>runtime</scope>
             </dependency>
 
-            <!-- Springdoc OpenAPI (Swagger UI) -->
+            <!-- Swagger -->
             <dependency>
                 <groupId>org.springdoc</groupId>
                 <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
                 <version>${springdoc.version}</version>
             </dependency>
 
-            <!-- ModelMapper — Entity ↔ DTO conversion -->
+            <!-- ModelMapper -->
             <dependency>
                 <groupId>org.modelmapper</groupId>
                 <artifactId>modelmapper</artifactId>
@@ -142,7 +106,7 @@
         </dependencies>
     </dependencyManagement>
 
-    <!-- ── Build Plugins ── -->
+    <!-- Build Plugins -->
     <build>
         <pluginManagement>
             <plugins>
@@ -156,6 +120,21 @@
                                 <artifactId>lombok</artifactId>
                             </exclude>
                         </excludes>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <configuration>
+                        <source>${java.version}</source>
+                        <target>${java.version}</target>
+                        <annotationProcessorPaths>
+                            <path>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                                <version>${lombok.version}</version>
+                            </path>
+                        </annotationProcessorPaths>
                     </configuration>
                 </plugin>
             </plugins>
