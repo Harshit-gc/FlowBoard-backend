@@ -1,0 +1,33 @@
+target/
+*.class
+*.jar
+*.war
+
+# ── Maven wrapper (optional to keep) ──
+!.mvn/wrapper/maven-wrapper.jar
+
+# ── IntelliJ IDEA ──
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# ── OS files ──
+.DS_Store
+Thumbs.db
+
+# ── Spring Boot ──
+application-local.yml
+application-local.properties
+
+# ── Secrets — NEVER commit these ──
+*.env
+.env
+secrets.yml
+
+# ── Logs ──
+logs/
+*.log
+← Back
+
