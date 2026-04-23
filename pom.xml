@@ -25,7 +25,7 @@
     <!-- Child Modules -->
     <modules>
         <module>auth-service</module>
-        <!-- <module>workspace-board-service</module> -->
+        <module>workspace-board-service</module>
         <!-- <module>task-service</module>             -->
         <!-- <module>collaboration-service</module>    -->
         <!-- <module>notification-service</module>     -->
