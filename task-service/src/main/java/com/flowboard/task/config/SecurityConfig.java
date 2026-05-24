@@ -28,8 +28,13 @@ public class SecurityConfig {
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/api-docs/**",
-                                "/v3/api-docs/**"
-                        ).permitAll()
+                                "/v3/api-docs/**",
+                                "/api/v1/cards/*/owner",
+                                "/api/v1/cards/board/*/count",
+                                "/api/v1/lists/board/*/count",
+                                "/api/v1/lists/board/*",
+                                "/api/v1/cards/list/*"
+                                ).permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthFilter,

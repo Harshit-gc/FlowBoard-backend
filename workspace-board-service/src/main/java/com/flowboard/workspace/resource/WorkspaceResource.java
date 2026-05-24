@@ -78,14 +78,28 @@ public class WorkspaceResource {
                 workspaceService.getPublicWorkspaces());
     }
 
+    @GetMapping("/all")
+    @Operation(summary = "Get all workspaces — Platform Admin only")
+    public ResponseEntity<List<WorkspaceResponse>> getAllWorkspaces(
+            @RequestHeader("Authorization") String bearer) {
+        String role = jwtConfig.getRoleFromToken(bearer.substring(7));
+        if (!"PLATFORM_ADMIN".equals(role)) {
+            return ResponseEntity.status(403).build();
+        }
+        return ResponseEntity.ok(workspaceService.getAllWorkspaces());
+    }
+
     @PutMapping("/{workspaceId}")
     @Operation(summary = "Update workspace details")
     public ResponseEntity<WorkspaceResponse> update(
             @PathVariable Integer workspaceId,
             @Valid @RequestBody WorkspaceRequest request,
             @RequestHeader("Authorization") String bearer) {
+        String token = bearer.substring(7);
         return ResponseEntity.ok(workspaceService.updateWorkspace(
-                workspaceId, request, getUserId(bearer)));
+                workspaceId, request,
+                getUserId(bearer),
+                jwtConfig.getRoleFromToken(token)));
     }
 
     @DeleteMapping("/{workspaceId}")
@@ -93,8 +107,11 @@ public class WorkspaceResource {
     public ResponseEntity<Map<String, String>> delete(
             @PathVariable Integer workspaceId,
             @RequestHeader("Authorization") String bearer) {
+        String token = bearer.substring(7);
         workspaceService.deleteWorkspace(
-                workspaceId, getUserId(bearer));
+                workspaceId,
+                getUserId(bearer),
+                jwtConfig.getRoleFromToken(token));
         return ResponseEntity.ok(
                 Map.of("message", "Workspace deleted successfully"));
     }

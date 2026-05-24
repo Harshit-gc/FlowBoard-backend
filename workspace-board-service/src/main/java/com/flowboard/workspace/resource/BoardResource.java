@@ -26,8 +26,6 @@ public class BoardResource {
     private final BoardService boardService;
     private final JwtConfig jwtConfig;
 
-    // ── Board CRUD ────────────────────────────────────────────────────────────
-
     @PostMapping
     @Operation(summary = "Create a new board in a workspace")
     public ResponseEntity<BoardResponse> create(
@@ -68,6 +66,12 @@ public class BoardResource {
                 boardService.getBoardsByMember(userId));
     }
 
+    @GetMapping("/public")
+    @Operation(summary = "Get all public boards — no auth required")
+    public ResponseEntity<List<BoardResponse>> getPublicBoards() {
+        return ResponseEntity.ok(boardService.getPublicBoards());
+    }
+
     @GetMapping
     @Operation(summary = "Get all boards — Platform Admin only")
     public ResponseEntity<List<BoardResponse>> getAll() {
@@ -81,7 +85,8 @@ public class BoardResource {
             @Valid @RequestBody BoardRequest request,
             @RequestHeader("Authorization") String bearer) {
         return ResponseEntity.ok(boardService.updateBoard(
-                boardId, request, getUserId(bearer)));
+                boardId, request,
+                getUserId(bearer), isPlatformAdmin(bearer)));
     }
 
     @PutMapping("/{boardId}/close")
@@ -90,7 +95,8 @@ public class BoardResource {
             @PathVariable Integer boardId,
             @RequestHeader("Authorization") String bearer) {
         return ResponseEntity.ok(
-                boardService.closeBoard(boardId, getUserId(bearer)));
+                boardService.closeBoard(boardId,
+                        getUserId(bearer), isPlatformAdmin(bearer)));
     }
 
     @PutMapping("/{boardId}/reopen")
@@ -99,7 +105,8 @@ public class BoardResource {
             @PathVariable Integer boardId,
             @RequestHeader("Authorization") String bearer) {
         return ResponseEntity.ok(
-                boardService.reopenBoard(boardId, getUserId(bearer)));
+                boardService.reopenBoard(boardId,
+                        getUserId(bearer), isPlatformAdmin(bearer)));
     }
 
     @DeleteMapping("/{boardId}")
@@ -107,23 +114,19 @@ public class BoardResource {
     public ResponseEntity<Map<String, String>> delete(
             @PathVariable Integer boardId,
             @RequestHeader("Authorization") String bearer) {
-        boardService.deleteBoard(boardId, getUserId(bearer));
+        boardService.deleteBoard(boardId,
+                getUserId(bearer), isPlatformAdmin(bearer));
         return ResponseEntity.ok(
                 Map.of("message", "Board deleted successfully"));
     }
 
-    // ── Analytics ─────────────────────────────────────────────────────────────
-
     @GetMapping("/{boardId}/analytics")
-    @Operation(summary = "Get board analytics — member count, "
-            + "card counts, completion rate")
+    @Operation(summary = "Get board analytics")
     public ResponseEntity<BoardAnalyticsResponse> getAnalytics(
             @PathVariable Integer boardId) {
         return ResponseEntity.ok(
                 boardService.getBoardAnalytics(boardId));
     }
-
-    // ── Member Management ─────────────────────────────────────────────────────
 
     @GetMapping("/{boardId}/members")
     @Operation(summary = "Get all members of a board")
@@ -139,8 +142,8 @@ public class BoardResource {
             @Valid @RequestBody AddMemberRequest request,
             @RequestHeader("Authorization") String bearer) {
         return ResponseEntity.status(201).body(
-                boardService.addMember(
-                        boardId, request, getUserId(bearer)));
+                boardService.addMember(boardId, request,
+                        getUserId(bearer), isPlatformAdmin(bearer)));
     }
 
     @DeleteMapping("/{boardId}/members/{userId}")
@@ -149,7 +152,8 @@ public class BoardResource {
             @PathVariable Integer boardId,
             @PathVariable Integer userId,
             @RequestHeader("Authorization") String bearer) {
-        boardService.removeMember(boardId, userId, getUserId(bearer));
+        boardService.removeMember(boardId, userId,
+                getUserId(bearer), isPlatformAdmin(bearer));
         return ResponseEntity.ok(
                 Map.of("message", "Member removed successfully"));
     }
@@ -162,10 +166,16 @@ public class BoardResource {
             @Valid @RequestBody UpdateMemberRoleRequest request,
             @RequestHeader("Authorization") String bearer) {
         return ResponseEntity.ok(boardService.updateMemberRole(
-                boardId, userId, request, getUserId(bearer)));
+                boardId, userId, request,
+                getUserId(bearer), isPlatformAdmin(bearer)));
     }
 
     private Integer getUserId(String bearer) {
         return jwtConfig.getUserIdFromToken(bearer.substring(7));
+    }
+
+    private boolean isPlatformAdmin(String bearer) {
+        return "PLATFORM_ADMIN".equals(
+                jwtConfig.getRoleFromToken(bearer.substring(7)));
     }
 }

@@ -28,16 +28,14 @@ spring:
 
       routes:
 
-        # ── AUTH SERVICE (8081) ──────────────────────────────────────────────
+        # ── AUTH SERVICE (8081) ──────────────────────────────────────
 
-        # Public endpoints — no JWT required
         - id: auth-public
           uri: http://localhost:8081
           predicates:
-            - Path=/api/v1/auth/register,/api/v1/auth/login,/api/v1/auth/refresh,/api/v1/auth/validate
+            - Path=/api/v1/auth/register,/api/v1/auth/login,/api/v1/auth/refresh,/api/v1/auth/validate,/api/v1/auth/forgot-password/question,/api/v1/auth/forgot-password/reset
           order: 1
 
-        # Admin endpoints — JWT + PLATFORM_ADMIN role required
         - id: auth-admin
           uri: http://localhost:8081
           predicates:
@@ -48,35 +46,145 @@ spring:
                 requiredRole: PLATFORM_ADMIN
           order: 2
 
-        # All other auth endpoints — JWT required
+        - id: auth-profile-public
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/v1/auth/profile/{userId}
+            - Method=GET
+          order: 3
+
         - id: auth-protected
           uri: http://localhost:8081
           predicates:
             - Path=/api/v1/auth/**
           filters:
             - AuthFilter
-          order: 3
+          order: 4
 
-        # ── WORKSPACE-BOARD SERVICE (8082) ───────────────────────────────────
+        # ── WORKSPACE-BOARD SERVICE (8082) — PUBLIC ROUTES ───────────
 
-        # Public board view — no JWT required (guest access from PDF)
-        - id: public-boards
+        - id: public-board-view
           uri: http://localhost:8082
           predicates:
             - Path=/api/v1/boards/{boardId}
             - Method=GET
-          order: 4
+          order: 5
 
-        # All workspace and board endpoints — JWT required
+        - id: workspace-public
+          uri: http://localhost:8082
+          predicates:
+            - Path=/api/v1/workspaces/public
+            - Method=GET
+          order: 6
+
+        - id: workspace-get-by-id-public
+          uri: http://localhost:8082
+          predicates:
+            - Path=/api/v1/workspaces/{workspaceId}
+            - Method=GET
+          order: 7
+
+        - id: boards-by-workspace-public
+          uri: http://localhost:8082
+          predicates:
+            - Path=/api/v1/boards/workspace/{workspaceId}
+            - Method=GET
+          order: 8
+
+        - id: boards-public-list
+          uri: http://localhost:8082
+          predicates:
+            - Path=/api/v1/boards/public
+            - Method=GET
+          order: 9
+
+        - id: lists-by-board-public
+          uri: http://localhost:8083
+          predicates:
+            - Path=/api/v1/lists/board/{boardId}
+            - Method=GET
+          order: 10
+
+        - id: cards-by-list-public
+          uri: http://localhost:8083
+          predicates:
+            - Path=/api/v1/cards/list/{listId}
+            - Method=GET
+          order: 11
+
+        # ── COLLABORATION SERVICE (8084) ─────────────────────────────
+        # ⚠️ These MUST come before workspace-board and task routes
+        # because /api/v1/cards/* and /api/v1/boards/* are shared prefixes
+
+        # Board-scoped labels → collaboration-service
+        - id: collab-board-labels
+          uri: http://localhost:8084
+          predicates:
+            - Path=/api/v1/boards/{boardId}/labels
+          filters:
+            - AuthFilter
+          order: 12
+
+        # Card-scoped comments → collaboration-service
+        - id: collab-card-comments
+          uri: http://localhost:8084
+          predicates:
+            - Path=/api/v1/cards/{cardId}/comments,/api/v1/cards/{cardId}/comments/count
+          filters:
+            - AuthFilter
+          order: 13
+
+        # Card-scoped attachments → collaboration-service
+        - id: collab-card-attachments
+          uri: http://localhost:8084
+          predicates:
+            - Path=/api/v1/cards/{cardId}/attachments,/api/v1/cards/{cardId}/attachments/count
+          filters:
+            - AuthFilter
+          order: 14
+
+        # Card-scoped labels → collaboration-service
+        - id: collab-card-labels
+          uri: http://localhost:8084
+          predicates:
+            - Path=/api/v1/cards/{cardId}/labels,/api/v1/cards/{cardId}/labels/{labelId}
+          filters:
+            - AuthFilter
+          order: 15
+
+        # Card-scoped checklists → collaboration-service
+        - id: collab-card-checklists
+          uri: http://localhost:8084
+          predicates:
+            - Path=/api/v1/cards/{cardId}/checklists
+          filters:
+            - AuthFilter
+          order: 16
+
+        # Collaboration own prefixes
+        - id: collaboration
+          uri: http://localhost:8084
+          predicates:
+            - Path=/api/v1/comments/**,/api/v1/attachments/**,/api/v1/labels/**,/api/v1/checklists/**,/api/v1/checklist-items/**
+          filters:
+            - AuthFilter
+          order: 17
+
+        # ── WORKSPACE-BOARD SERVICE (8082) ───────────────────────────
+        # Comes AFTER collab-board-labels so /boards/{id}/labels
+        # is already matched above
+
         - id: workspace-board
           uri: http://localhost:8082
           predicates:
             - Path=/api/v1/workspaces/**,/api/v1/boards/**
           filters:
             - AuthFilter
-          order: 5
+          order: 18
 
-        # ── TASK SERVICE (8083) ──────────────────────────────────────────────
+        # ── TASK SERVICE (8083) ──────────────────────────────────────
+        # Comes AFTER all collab card sub-paths so /cards/{id}/comments
+        # etc. are already matched above
 
         - id: task
           uri: http://localhost:8083
@@ -84,19 +192,9 @@ spring:
             - Path=/api/v1/lists/**,/api/v1/cards/**
           filters:
             - AuthFilter
-          order: 6
+          order: 19
 
-        # ── COLLABORATION SERVICE (8084) ─────────────────────────────────────
-
-        - id: collaboration
-          uri: http://localhost:8084
-          predicates:
-            - Path=/api/v1/comments/**,/api/v1/attachments/**,/api/v1/labels/**,/api/v1/checklists/**,/api/v1/checklist-items/**
-          filters:
-            - AuthFilter
-          order: 7
-
-        # ── NOTIFICATION SERVICE (8085) ──────────────────────────────────────
+        # ── NOTIFICATION SERVICE (8085) ──────────────────────────────
 
         - id: notification
           uri: http://localhost:8085
@@ -104,14 +202,12 @@ spring:
             - Path=/api/v1/notifications/**
           filters:
             - AuthFilter
-          order: 8
+          order: 20
 
-# ── JWT secret — must match all 5 services exactly ───────────────────────────
 app:
   jwt:
     secret: flowboard_super_secret_key_change_in_production_min_256_bits
 
-# ── Actuator ─────────────────────────────────────────────────────────────────
 management:
   endpoints:
     web:
@@ -121,7 +217,6 @@ management:
     health:
       show-details: always
 
-# ── Logging ───────────────────────────────────────────────────────────────────
 logging:
   level:
     org.springframework.cloud.gateway: INFO

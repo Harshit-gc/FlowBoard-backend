@@ -37,13 +37,8 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     public NotificationResponse send(NotificationRequest request) {
-        if (request.getRecipientId().equals(request.getActorId())) {
-            throw new AppException(
-                    "Sender and recipient cannot be the same user",
-                    HttpStatus.BAD_REQUEST
-            );
-        }
-
+        // Self-notification check kept for HTTP endpoint only
+        // Consumer skips self-notifications before calling this
         Notification notification = Notification.builder()
                 .recipientId(request.getRecipientId())
                 .actorId(request.getActorId())
@@ -57,12 +52,8 @@ public class NotificationServiceImpl implements NotificationService {
                 .build();
 
         Notification saved = notificationRepository.save(notification);
-
-        if (isCriticalEvent(request.getType())) {
-            log.info("Critical notification type={} for recipientId={} — email dispatch triggered",
-                    request.getType(), request.getRecipientId());
-        }
-
+        log.info("Notification saved: type={} recipient={}",
+                request.getType(), request.getRecipientId());
         return toResponse(saved);
     }
 

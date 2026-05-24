@@ -33,6 +33,9 @@ public class NotificationResource {
     public ResponseEntity<NotificationResponse> send(
             @RequestHeader("Authorization") String bearer,
             @Valid @RequestBody NotificationRequest request) {
+        if (request.getRecipientId().equals(request.getActorId())) {
+            return ResponseEntity.badRequest().build();
+        }
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(notificationService.send(request));
     }

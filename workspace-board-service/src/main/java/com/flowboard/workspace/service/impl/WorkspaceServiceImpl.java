@@ -101,11 +101,22 @@ public class WorkspaceServiceImpl implements WorkspaceService {
     }
 
     @Override
+    public List<WorkspaceResponse> getAllWorkspaces() {
+        return workspaceRepository.findAll()
+                .stream().map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public WorkspaceResponse updateWorkspace(Integer workspaceId,
                                              WorkspaceRequest request,
-                                             Integer requesterId) {
+                                             Integer requesterId,
+                                             String requesterRole) {
         Workspace workspace = findWorkspace(workspaceId);
-        validateOwnerOrAdmin(workspace, requesterId);
+
+        if (!"PLATFORM_ADMIN".equals(requesterRole)) {
+            validateOwnerOrAdmin(workspace, requesterId);
+        }
 
         if (request.getName() != null)
             workspace.setName(request.getName());
@@ -123,9 +134,13 @@ public class WorkspaceServiceImpl implements WorkspaceService {
     @Override
     @Transactional
     public void deleteWorkspace(Integer workspaceId,
-                                Integer requesterId) {
+                                Integer requesterId,
+                                String requesterRole) {
         Workspace workspace = findWorkspace(workspaceId);
-        validateOwnerOrAdmin(workspace, requesterId);
+        if (!"PLATFORM_ADMIN".equals(requesterRole)) {
+            validateOwnerOrAdmin(workspace, requesterId);
+        }
+
         memberRepository.findByWorkspaceId(workspaceId)
                 .forEach(memberRepository::delete);
         workspaceRepository.delete(workspace);

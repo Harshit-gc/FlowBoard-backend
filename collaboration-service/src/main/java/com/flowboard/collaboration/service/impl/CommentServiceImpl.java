@@ -1,40 +1,44 @@
 package com.flowboard.collaboration.service.impl;
 
+import com.flowboard.collaboration.client.CardClient;
 import com.flowboard.collaboration.dto.*;
 import com.flowboard.collaboration.entity.Attachment;
 import com.flowboard.collaboration.entity.Comment;
 import com.flowboard.collaboration.exception.AppException;
+import com.flowboard.collaboration.messaging.NotificationEvent;
+import com.flowboard.collaboration.messaging.NotificationPublisher;
 import com.flowboard.collaboration.repository.AttachmentRepository;
 import com.flowboard.collaboration.repository.CommentRepository;
 import com.flowboard.collaboration.service.CommentService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class CommentServiceImpl implements CommentService {
 
     private final CommentRepository commentRepository;
     private final AttachmentRepository attachmentRepository;
+    private final NotificationPublisher notificationPublisher;
+    private final CardClient cardClient;
 
     // ── Comment Operations ────────────────────────────────────────────────────
 
     @Override
     public CommentResponse addComment(CommentRequest request,
                                       Integer authorId) {
-        // Validate parent comment exists if replying
         if (request.getParentCommentId() != null) {
-            commentRepository.findById(
-                            request.getParentCommentId())
+            commentRepository.findById(request.getParentCommentId())
                     .orElseThrow(() -> new AppException(
-                            "Parent comment not found",
-                            HttpStatus.NOT_FOUND));
+                            "Parent comment not found", HttpStatus.NOT_FOUND));
         }
-
         Comment comment = Comment.builder()
                 .cardId(request.getCardId())
                 .authorId(authorId)
@@ -42,8 +46,97 @@ public class CommentServiceImpl implements CommentService {
                 .parentCommentId(request.getParentCommentId())
                 .isDeleted(false)
                 .build();
+        CommentResponse saved = toResponse(commentRepository.save(comment));
 
-        return toResponse(commentRepository.save(comment));
+        try {
+            Map<String, Object> cardInfo =
+                    cardClient.getCardInfo(request.getCardId());
+
+            if (cardInfo != null) {
+                Integer cardOwnerId =
+                        ((Number) cardInfo.get("createdById")).intValue();
+                Integer assigneeId = cardInfo.get("assigneeId") != null
+                        && !cardInfo.get("assigneeId").equals(-1)
+                        ? ((Number) cardInfo.get("assigneeId")).intValue()
+                        : null;
+                String cardTitle = (String) cardInfo.get("title");
+                Integer boardId =
+                        ((Number) cardInfo.get("boardId")).intValue();
+
+                // Notify the parent comment author
+                if (request.getParentCommentId() != null) {
+                    Comment parentComment = commentRepository
+                            .findById(request.getParentCommentId())
+                            .orElse(null);
+
+                    java.util.Set<Integer> toNotify = new java.util.HashSet<>();
+
+                    // Notify parent comment author
+                    if (parentComment != null && !parentComment.getAuthorId().equals(authorId)) {
+                        toNotify.add(parentComment.getAuthorId());
+                    }
+                    // Also notify card owner and assignee
+                    if (!cardOwnerId.equals(authorId)) {
+                        toNotify.add(cardOwnerId);
+                    }
+                    if (assigneeId != null && !assigneeId.equals(authorId)) {
+                        toNotify.add(assigneeId);
+                    }
+
+                    for (Integer recipientId : toNotify) {
+                        String notifTitle = recipientId.equals(cardOwnerId)
+                                ? "New reply on your card"
+                                : recipientId.equals(assigneeId)
+                                  ? "New reply on an assigned card"
+                                  : "Someone replied to your comment";
+
+                        notificationPublisher.publish(
+                                NotificationEvent.builder()
+                                        .recipientId(recipientId)
+                                        .actorId(authorId)
+                                        .type("COMMENT")
+                                        .title(notifTitle)
+                                        .message("New reply on card: " + cardTitle)
+                                        .relatedId(request.getCardId())
+                                        .relatedType("CARD")
+                                        .deepLinkUrl("/board/" + boardId)
+                                        .build());
+                    }
+
+                    // Notify card owner and assignee
+                } else {
+                    java.util.Set<Integer> toNotify = new java.util.HashSet<>();
+                    if (!cardOwnerId.equals(authorId)) {
+                        toNotify.add(cardOwnerId);
+                    }
+                    if (assigneeId != null && !assigneeId.equals(authorId)) {
+                        toNotify.add(assigneeId);
+                    }
+                    for (Integer recipientId : toNotify) {
+                        String notifTitle = recipientId.equals(cardOwnerId)
+                                ? "New comment on your card"
+                                : "New comment on an assigned card";
+
+                        notificationPublisher.publish(
+                                NotificationEvent.builder()
+                                        .recipientId(recipientId)
+                                        .actorId(authorId)
+                                        .type("COMMENT")
+                                        .title(notifTitle)
+                                        .message("Someone commented on: " + cardTitle)
+                                        .relatedId(request.getCardId())
+                                        .relatedType("CARD")
+                                        .deepLinkUrl("/board/" + boardId)
+                                        .build());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to publish comment notification: {}",
+                    e.getMessage());
+        }
+
+        return saved;
     }
 
     @Override

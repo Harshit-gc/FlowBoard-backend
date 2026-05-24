@@ -3,6 +3,7 @@ package com.flowboard.collaboration.service.impl;
 import com.flowboard.collaboration.dto.*;
 import com.flowboard.collaboration.entity.*;
 import com.flowboard.collaboration.exception.AppException;
+import com.flowboard.collaboration.messaging.NotificationPublisher;
 import com.flowboard.collaboration.repository.*;
 import com.flowboard.collaboration.service.LabelService;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,7 @@ public class LabelServiceImpl implements LabelService {
     private final CardLabelRepository cardLabelRepository;
     private final ChecklistRepository checklistRepository;
     private final ChecklistItemRepository checklistItemRepository;
+    private final NotificationPublisher notificationPublisher;
 
     // ── Label CRUD ────────────────────────────────────────────────────────────
 

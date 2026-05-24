@@ -12,26 +12,24 @@ public interface BoardService {
     List<BoardResponse> getBoardsByMember(Integer userId);
     List<BoardResponse> getClosedBoards(Integer workspaceId);
     List<BoardResponse> getAllBoards();
-    BoardResponse updateBoard(Integer boardId,
-                              BoardRequest request,
-                              Integer requesterId);
-    BoardResponse closeBoard(Integer boardId, Integer requesterId);
-    BoardResponse reopenBoard(Integer boardId, Integer requesterId);
-    void deleteBoard(Integer boardId, Integer requesterId);
+    List<BoardResponse> getPublicBoards();
 
-    // Member operations
-    BoardMember addMember(Integer boardId,
-                          AddMemberRequest request,
-                          Integer requesterId);
-    void removeMember(Integer boardId,
-                      Integer userId,
-                      Integer requesterId);
-    BoardMember updateMemberRole(Integer boardId,
-                                 Integer userId,
+    BoardResponse updateBoard(Integer boardId, BoardRequest request,
+                              Integer requesterId, boolean isPlatformAdmin);
+    BoardResponse closeBoard(Integer boardId, Integer requesterId,
+                             boolean isPlatformAdmin);
+    BoardResponse reopenBoard(Integer boardId, Integer requesterId,
+                              boolean isPlatformAdmin);
+    void deleteBoard(Integer boardId, Integer requesterId,
+                     boolean isPlatformAdmin);
+
+    BoardMember addMember(Integer boardId, AddMemberRequest request,
+                          Integer requesterId, boolean isPlatformAdmin);
+    void removeMember(Integer boardId, Integer userId,
+                      Integer requesterId, boolean isPlatformAdmin);
+    BoardMember updateMemberRole(Integer boardId, Integer userId,
                                  UpdateMemberRoleRequest request,
-                                 Integer requesterId);
+                                 Integer requesterId, boolean isPlatformAdmin);
     List<BoardMember> getMembers(Integer boardId);
-
-    // Analytics
     BoardAnalyticsResponse getBoardAnalytics(Integer boardId);
 }

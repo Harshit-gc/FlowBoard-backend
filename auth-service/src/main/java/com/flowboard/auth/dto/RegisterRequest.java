@@ -1,5 +1,6 @@
 package com.flowboard.auth.dto;
 
+import com.flowboard.auth.entity.User;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -19,4 +20,6 @@ public class RegisterRequest {
 
     @NotBlank @Size(min = 6, message = "Password must be at least 6 characters")
     private String password;
+
+    private User.Role role = User.Role.MEMBER;
 }

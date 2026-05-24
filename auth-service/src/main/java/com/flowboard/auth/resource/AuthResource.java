@@ -11,6 +11,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.flowboard.auth.dto.ResetPasswordRequest;
+import com.flowboard.auth.dto.SecurityQuestionResponse;
 
 import java.util.List;
 import java.util.Map;
@@ -53,6 +55,22 @@ public class AuthResource {
         return ResponseEntity.ok(Map.of("valid", valid));
     }
 
+    @GetMapping("/forgot-password/question")
+    @Operation(summary = "Get security question by email (public)")
+    public ResponseEntity<SecurityQuestionResponse> getSecurityQuestion(
+            @RequestParam String email) {
+        return ResponseEntity.ok(authService.getSecurityQuestion(email));
+    }
+
+    @PostMapping("/forgot-password/reset")
+    @Operation(summary = "Reset password using security answer (public)")
+    public ResponseEntity<Map<String, String>> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request);
+        return ResponseEntity.ok(
+                Map.of("message", "Password reset successfully"));
+    }
+
     // ─── AUTHENTICATED ENDPOINTS ─────────────────────────────────────────────
 
     @GetMapping("/profile/{userId}")
@@ -80,8 +98,10 @@ public class AuthResource {
 
     @PutMapping("/deactivate/{userId}")
     @Operation(summary = "Deactivate own account", security = @SecurityRequirement(name = "bearerAuth"))
-    public ResponseEntity<Map<String, String>> deactivate(@PathVariable Integer userId) {
-        authService.deactivateAccount(userId);
+    public ResponseEntity<Map<String, String>> deactivate(
+            @PathVariable Integer userId,
+            @Valid @RequestBody DeactivateRequest request) {
+        authService.deactivateAccount(userId, request.getPassword());
         return ResponseEntity.ok(Map.of("message", "Account deactivated"));
     }
 
@@ -115,9 +135,23 @@ public class AuthResource {
     @PutMapping("/admin/users/{userId}/reactivate")
     @Operation(summary = "Reactivate a suspended user (Admin only)", security = @SecurityRequirement(name = "bearerAuth"))
     public ResponseEntity<Map<String, String>> reactivateUser(@PathVariable Integer userId) {
-        User user = authService.getUserById(userId);
-        user.setActive(true);
-        // save is handled in service — for now calling updateProfile with no changes
+        authService.reactivateUser(userId);
         return ResponseEntity.ok(Map.of("message", "User reactivated"));
+    }
+
+    @PutMapping("/admin/users/{userId}/deactivate")
+    @Operation(summary = "Deactivate a user (Admin only)", security = @SecurityRequirement(name = "bearerAuth"))
+    public ResponseEntity<Map<String, String>> deactivateUser(@PathVariable Integer userId) {
+        authService.deactivateUser(userId);
+        return ResponseEntity.ok(Map.of("message", "User deactivated"));
+    }
+
+    @PutMapping("/admin/users/{userId}")
+    @Operation(summary = "Admin update user details", security = @SecurityRequirement(name = "bearerAuth"))
+    public ResponseEntity<Map<String, String>> adminUpdateUser(
+            @PathVariable Integer userId,
+            @RequestBody AdminUpdateUserRequest request) {
+        authService.adminUpdateUser(userId, request);
+        return ResponseEntity.ok(Map.of("message", "User updated successfully"));
     }
 }

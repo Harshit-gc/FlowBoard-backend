@@ -22,11 +22,11 @@ public class CardRequest {
 
     @Pattern(regexp = "LOW|MEDIUM|HIGH|CRITICAL",
             message = "Priority must be LOW, MEDIUM, HIGH or CRITICAL")
-    private String priority = "MEDIUM";
+    private String priority;
 
     @Pattern(regexp = "TO_DO|IN_PROGRESS|IN_REVIEW|DONE",
             message = "Status must be TO_DO, IN_PROGRESS, IN_REVIEW or DONE")
-    private String status = "TO_DO";
+    private String status;
 
     private LocalDate dueDate;
     private LocalDate startDate;

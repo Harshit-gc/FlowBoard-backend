@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 public class BoardResponse {
     private Integer boardId;
     private Integer workspaceId;
+    private String workspaceName;
     private String name;
     private String description;
     private String background;

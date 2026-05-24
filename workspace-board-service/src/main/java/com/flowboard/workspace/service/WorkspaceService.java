@@ -13,10 +13,13 @@ public interface WorkspaceService {
     List<WorkspaceResponse> getByMember(Integer userId);
     List<WorkspaceResponse> getMyWorkspaces(Integer userId);
     List<WorkspaceResponse> getPublicWorkspaces();
+    List<WorkspaceResponse> getAllWorkspaces();
     WorkspaceResponse updateWorkspace(Integer workspaceId,
                                       WorkspaceRequest request,
-                                      Integer requesterId);
-    void deleteWorkspace(Integer workspaceId, Integer requesterId);
+                                      Integer requesterId,
+                                      String requesterRole);
+    void deleteWorkspace(Integer workspaceId, Integer requesterId,
+                         String requesterRole);
 
     // Member operations
     WorkspaceMember addMember(Integer workspaceId,

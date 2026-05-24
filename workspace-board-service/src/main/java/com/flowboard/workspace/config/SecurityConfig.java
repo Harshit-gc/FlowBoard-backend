@@ -26,6 +26,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/api/v1/workspaces/public",
+                                "/api/v1/workspaces/{workspaceId}",
+                                "/api/v1/boards/public",
+                                "/api/v1/boards/workspace/{workspaceId}",
+                                "/api/v1/boards/{boardId}",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/api-docs/**",

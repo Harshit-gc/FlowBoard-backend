@@ -2,6 +2,9 @@ package com.flowboard.task.resource;
 
 import com.flowboard.task.config.JwtConfig;
 import com.flowboard.task.dto.*;
+import com.flowboard.task.entity.Card;
+import com.flowboard.task.exception.AppException;
+import com.flowboard.task.repository.CardRepository;
 import com.flowboard.task.service.CardService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -24,6 +27,7 @@ public class CardResource {
 
     private final CardService cardService;
     private final JwtConfig jwtConfig;
+    private final CardRepository cardRepository;
 
     // ── Card CRUD ─────────────────────────────────────────────────────────────
 
@@ -72,6 +76,12 @@ public class CardResource {
             @PathVariable Integer boardId) {
         return ResponseEntity.ok(
                 cardService.getArchivedCards(boardId));
+    }
+
+    @GetMapping("/board/{boardId}/count")
+    @Operation(summary = "Get cards count in a board")
+    public ResponseEntity<Long> getCardCountByBoard(@PathVariable Integer boardId) {
+        return ResponseEntity.ok(cardRepository.countByBoardId(boardId));
     }
 
     @PutMapping("/{cardId}")
@@ -136,7 +146,7 @@ public class CardResource {
                 Map.of("message", "Card deleted successfully"));
     }
 
-    // ── Assignment, Priority, Status ──────────────────────────────────────────
+    // ── Assignment, Priority, Status, Start-Date, Due-Date ──────────────────────────────────────────
 
     @PutMapping("/{cardId}/assignee")
     @Operation(summary = "Assign or unassign a member to a card")
@@ -172,6 +182,12 @@ public class CardResource {
 
     // ── Overdue and Search ────────────────────────────────────────────────────
 
+    @GetMapping("/all")
+    @Operation(summary = "Get all cards across the platform (Admin only)")
+    public ResponseEntity<List<CardResponse>> getAllCards() {
+        return ResponseEntity.ok(cardService.getAllCards());
+    }
+
     @GetMapping("/overdue")
     @Operation(summary = "Get all overdue cards across the platform")
     public ResponseEntity<List<CardResponse>> getOverdue() {
@@ -203,6 +219,13 @@ public class CardResource {
             @PathVariable Integer cardId) {
         return ResponseEntity.ok(
                 cardService.getCardActivity(cardId));
+    }
+
+    @GetMapping("/{cardId}/owner")
+    @Operation(summary = "Internal: get card owner info for notifications")
+    public ResponseEntity<Map<String, Object>> getOwner(
+            @PathVariable Integer cardId) {
+        return ResponseEntity.ok(cardService.getCardOwnerInfo(cardId));
     }
 
     private Integer getUserId(String bearer) {

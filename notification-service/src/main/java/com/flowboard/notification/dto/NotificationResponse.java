@@ -18,7 +18,7 @@ public class NotificationResponse {
     private String message;
     private int relatedId;
     private String relatedType;
-    private boolean isRead;
+    private Boolean isRead;
     private String deepLinkUrl;
     private LocalDateTime createdAt;
 }

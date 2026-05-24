@@ -32,8 +32,14 @@ public class User {
 
     private String bio;
 
+    private String securityQuestion;
+
+    private String securityAnswer;
+
     @Enumerated(EnumType.STRING)
-    private Provider provider;   // LOCAL, GOOGLE, GITHUB
+    private Provider provider;   // LOCAL, GOOGLE
+
+    private String providerId;  // stores Google's unique user ID
 
     @Column(nullable = false)
     private boolean isActive = true;
@@ -47,5 +53,5 @@ public class User {
     }
 
     public enum Role { MEMBER, BOARD_OWNER, PLATFORM_ADMIN }
-    public enum Provider { LOCAL, GOOGLE, GITHUB }
+    public enum Provider { LOCAL, GOOGLE }
 }

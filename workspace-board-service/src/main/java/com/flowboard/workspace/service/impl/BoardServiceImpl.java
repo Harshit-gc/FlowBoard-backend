@@ -1,11 +1,14 @@
 package com.flowboard.workspace.service.impl;
 
+import com.flowboard.workspace.client.TaskServiceClient;
 import com.flowboard.workspace.dto.*;
 import com.flowboard.workspace.entity.Board;
 import com.flowboard.workspace.entity.BoardMember;
+import com.flowboard.workspace.entity.Workspace;
 import com.flowboard.workspace.exception.AppException;
 import com.flowboard.workspace.repository.BoardMemberRepository;
 import com.flowboard.workspace.repository.BoardRepository;
+import com.flowboard.workspace.repository.WorkspaceRepository;
 import com.flowboard.workspace.service.BoardService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -21,6 +24,8 @@ public class BoardServiceImpl implements BoardService {
 
     private final BoardRepository boardRepository;
     private final BoardMemberRepository boardMemberRepository;
+    private final TaskServiceClient taskServiceClient;
+    private final WorkspaceRepository workspaceRepository;
 
     @Override
     public BoardResponse createBoard(BoardRequest request,
@@ -37,7 +42,6 @@ public class BoardServiceImpl implements BoardService {
                 .build();
         board = boardRepository.save(board);
 
-        // Auto-add creator as ADMIN board member
         BoardMember creatorMember = BoardMember.builder()
                 .boardId(board.getBoardId())
                 .userId(createdById)
@@ -86,11 +90,21 @@ public class BoardServiceImpl implements BoardService {
     }
 
     @Override
+    public List<BoardResponse> getPublicBoards() {
+        return boardRepository.findByVisibility(Board.Visibility.PUBLIC)
+                .stream()
+                .filter(b -> !b.isClosed())
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public BoardResponse updateBoard(Integer boardId,
                                      BoardRequest request,
-                                     Integer requesterId) {
+                                     Integer requesterId,
+                                     boolean isPlatformAdmin) {
         Board board = findBoard(boardId);
-        validateBoardAdmin(board, requesterId);
+        validateBoardAdmin(board, requesterId, isPlatformAdmin);
 
         if (request.getName() != null)
             board.setName(request.getName());
@@ -107,9 +121,10 @@ public class BoardServiceImpl implements BoardService {
 
     @Override
     public BoardResponse closeBoard(Integer boardId,
-                                    Integer requesterId) {
+                                    Integer requesterId,
+                                    boolean isPlatformAdmin) {
         Board board = findBoard(boardId);
-        validateBoardAdmin(board, requesterId);
+        validateBoardAdmin(board, requesterId, isPlatformAdmin);
         if (board.isClosed()) {
             throw new AppException(
                     "Board is already closed",
@@ -121,9 +136,10 @@ public class BoardServiceImpl implements BoardService {
 
     @Override
     public BoardResponse reopenBoard(Integer boardId,
-                                     Integer requesterId) {
+                                     Integer requesterId,
+                                     boolean isPlatformAdmin) {
         Board board = findBoard(boardId);
-        validateBoardAdmin(board, requesterId);
+        validateBoardAdmin(board, requesterId, isPlatformAdmin);
         if (!board.isClosed()) {
             throw new AppException(
                     "Board is not closed",
@@ -135,9 +151,11 @@ public class BoardServiceImpl implements BoardService {
 
     @Override
     @Transactional
-    public void deleteBoard(Integer boardId, Integer requesterId) {
+    public void deleteBoard(Integer boardId,
+                            Integer requesterId,
+                            boolean isPlatformAdmin) {
         Board board = findBoard(boardId);
-        validateBoardAdmin(board, requesterId);
+        validateBoardAdmin(board, requesterId, isPlatformAdmin);
         boardMemberRepository.findByBoardId(boardId)
                 .forEach(boardMemberRepository::delete);
         boardRepository.delete(board);
@@ -146,9 +164,10 @@ public class BoardServiceImpl implements BoardService {
     @Override
     public BoardMember addMember(Integer boardId,
                                  AddMemberRequest request,
-                                 Integer requesterId) {
+                                 Integer requesterId,
+                                 boolean isPlatformAdmin) {
         Board board = findBoard(boardId);
-        validateBoardAdmin(board, requesterId);
+        validateBoardAdmin(board, requesterId, isPlatformAdmin);
 
         if (boardMemberRepository.existsByBoardIdAndUserId(
                 boardId, request.getUserId())) {
@@ -169,11 +188,11 @@ public class BoardServiceImpl implements BoardService {
     @Transactional
     public void removeMember(Integer boardId,
                              Integer userId,
-                             Integer requesterId) {
+                             Integer requesterId,
+                             boolean isPlatformAdmin) {
         Board board = findBoard(boardId);
-        validateBoardAdmin(board, requesterId);
+        validateBoardAdmin(board, requesterId, isPlatformAdmin);
 
-        // Creator cannot be removed
         if (board.getCreatedById().equals(userId)) {
             throw new AppException(
                     "Cannot remove board creator",
@@ -186,9 +205,10 @@ public class BoardServiceImpl implements BoardService {
     public BoardMember updateMemberRole(Integer boardId,
                                         Integer userId,
                                         UpdateMemberRoleRequest request,
-                                        Integer requesterId) {
+                                        Integer requesterId,
+                                        boolean isPlatformAdmin) {
         Board board = findBoard(boardId);
-        validateBoardAdmin(board, requesterId);
+        validateBoardAdmin(board, requesterId, isPlatformAdmin);
 
         BoardMember member = boardMemberRepository
                 .findByBoardIdAndUserId(boardId, userId)
@@ -210,13 +230,19 @@ public class BoardServiceImpl implements BoardService {
         Board board = findBoard(boardId);
         int memberCount = boardMemberRepository
                 .findByBoardId(boardId).size();
+        long totalCards = taskServiceClient.getCardCountByBoard(boardId);
+        long totalLists = taskServiceClient.getListCountByBoard(boardId);
+
         return BoardAnalyticsResponse.builder()
                 .boardId(board.getBoardId())
                 .boardName(board.getName())
                 .totalMembers(memberCount)
+                .totalCards((int) totalCards)
+                .totalLists((int) totalLists)
                 .isClosed(board.isClosed())
                 .build();
     }
+
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -226,7 +252,11 @@ public class BoardServiceImpl implements BoardService {
                         "Board not found", HttpStatus.NOT_FOUND));
     }
 
-    private void validateBoardAdmin(Board board, Integer requesterId) {
+    private void validateBoardAdmin(Board board,
+                                    Integer requesterId,
+                                    boolean isPlatformAdmin) {
+        if (isPlatformAdmin) return;
+
         boolean isAdmin = boardMemberRepository
                 .findByBoardIdAndUserId(
                         board.getBoardId(), requesterId)
@@ -242,9 +272,16 @@ public class BoardServiceImpl implements BoardService {
     private BoardResponse toResponse(Board b) {
         int memberCount = boardMemberRepository
                 .findByBoardId(b.getBoardId()).size();
+
+        String workspaceName = workspaceRepository
+                .findById(b.getWorkspaceId())
+                .map(Workspace::getName)
+                .orElse(null);
+
         return BoardResponse.builder()
                 .boardId(b.getBoardId())
                 .workspaceId(b.getWorkspaceId())
+                .workspaceName(workspaceName)
                 .name(b.getName())
                 .description(b.getDescription())
                 .background(b.getBackground())

@@ -20,4 +20,6 @@ public interface UserRepository extends JpaRepository<User, Integer> {
     List<User> searchByFullName(String name);
 
     void deleteByUserId(Integer userId);
+
+    Optional<User> findByProviderAndProviderId(User.Provider provider, String providerId);
 }

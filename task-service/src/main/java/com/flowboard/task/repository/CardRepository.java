@@ -2,6 +2,7 @@ package com.flowboard.task.repository;
 
 import com.flowboard.task.entity.Card;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 import java.time.LocalDate;
@@ -53,5 +54,15 @@ public interface CardRepository extends JpaRepository<Card, Integer> {
             "AND c.boardId = :boardId AND c.isArchived = false")
     List<Card> searchByTitle(Integer boardId, String keyword);
 
+    @Modifying
+    @Query("UPDATE Card c SET c.boardId = :boardId WHERE c.listId = :listId")
+    void updateBoardIdByListId(Integer listId, Integer boardId);
+
+    List<Card> findByDueDateAndIsArchivedFalse(LocalDate dueDate);
+
     long countByListId(Integer listId);
+
+    long countByBoardId(Integer boardId);
+
+    void deleteByListId(Integer listId);
 }

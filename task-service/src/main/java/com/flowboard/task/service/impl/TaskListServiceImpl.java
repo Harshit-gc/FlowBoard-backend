@@ -128,15 +128,16 @@ public class TaskListServiceImpl implements TaskListService {
                     "Archive the list before deleting",
                     HttpStatus.BAD_REQUEST);
         }
+        cardRepository.deleteByListId(listId);
         listRepository.delete(list);
     }
 
     @Override
+    @Transactional
     public TaskListResponse moveList(Integer listId,
                                      MoveListRequest request) {
         TaskList list = findList(listId);
 
-        // Get max position in target board
         int newPosition = listRepository
                 .findMaxPosition(request.getTargetBoardId())
                 .map(p -> p + 1)
@@ -144,6 +145,8 @@ public class TaskListServiceImpl implements TaskListService {
 
         list.setBoardId(request.getTargetBoardId());
         list.setPosition(newPosition);
+        cardRepository.updateBoardIdByListId(listId, request.getTargetBoardId());
+
         return toResponse(listRepository.save(list));
     }
 

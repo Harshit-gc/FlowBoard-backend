@@ -2,6 +2,7 @@ package com.flowboard.task.service;
 
 import com.flowboard.task.dto.*;
 import java.util.List;
+import java.util.Map;
 
 public interface CardService {
 
@@ -41,6 +42,10 @@ public interface CardService {
                            StatusRequest request,
                            Integer actorId);
 
+
+    // Get all Cards
+    List<CardResponse> getAllCards();
+
     // Overdue
     List<CardResponse> getOverdueCards();
     List<CardResponse> getOverdueCardsByBoard(Integer boardId);
@@ -50,4 +55,5 @@ public interface CardService {
 
     // Activity log
     List<CardActivityResponse> getCardActivity(Integer cardId);
+    Map<String, Object> getCardOwnerInfo(Integer cardId);
 }

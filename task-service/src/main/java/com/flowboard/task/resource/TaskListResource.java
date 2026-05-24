@@ -2,6 +2,7 @@ package com.flowboard.task.resource;
 
 import com.flowboard.task.config.JwtConfig;
 import com.flowboard.task.dto.*;
+import com.flowboard.task.repository.TaskListRepository;
 import com.flowboard.task.service.TaskListService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -24,6 +25,7 @@ public class TaskListResource {
 
     private final TaskListService listService;
     private final JwtConfig jwtConfig;
+    private final TaskListRepository taskListRepository;
 
     @PostMapping
     @Operation(summary = "Create a new list on a board")
@@ -56,6 +58,12 @@ public class TaskListResource {
             @PathVariable Integer boardId) {
         return ResponseEntity.ok(
                 listService.getArchivedLists(boardId));
+    }
+
+    @GetMapping("/board/{boardId}/count")
+    @Operation(summary = "Get lists count for a board")
+    public ResponseEntity<Long> getListCountByBoard(@PathVariable Integer boardId) {
+        return ResponseEntity.ok(taskListRepository.countByBoardId(boardId));
     }
 
     @PutMapping("/{listId}")

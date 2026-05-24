@@ -43,6 +43,7 @@
         <springdoc.version>2.3.0</springdoc.version>
         <modelmapper.version>3.2.0</modelmapper.version>
         <mysql.version>8.3.0</mysql.version>
+        <spring-cloud.version>2023.0.0</spring-cloud.version>
     </properties>
 
     <!-- Shared Dependencies — auto inherited by every service -->
@@ -102,6 +103,15 @@
                 <groupId>org.modelmapper</groupId>
                 <artifactId>modelmapper</artifactId>
                 <version>${modelmapper.version}</version>
+            </dependency>
+
+            <!-- Spring Cloud BOM -->
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
 
         </dependencies>

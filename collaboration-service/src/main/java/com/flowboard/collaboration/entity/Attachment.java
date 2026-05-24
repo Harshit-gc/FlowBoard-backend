@@ -22,7 +22,7 @@ public class Attachment {
     @Column(nullable = false)
     private String fileName;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "LONGTEXT")
     private String fileUrl;
 
     private String fileType;

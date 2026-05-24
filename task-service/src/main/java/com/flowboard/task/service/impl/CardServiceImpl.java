@@ -4,6 +4,8 @@ import com.flowboard.task.dto.*;
 import com.flowboard.task.entity.Card;
 import com.flowboard.task.entity.CardActivity;
 import com.flowboard.task.exception.AppException;
+import com.flowboard.task.messaging.NotificationEvent;
+import com.flowboard.task.messaging.NotificationPublisher;
 import com.flowboard.task.repository.CardActivityRepository;
 import com.flowboard.task.repository.CardRepository;
 import com.flowboard.task.service.CardService;
@@ -15,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -22,6 +25,7 @@ public class CardServiceImpl implements CardService {
 
     private final CardRepository cardRepository;
     private final CardActivityRepository activityRepository;
+    private final NotificationPublisher notificationPublisher;
 
     @Override
     public CardResponse createCard(CardRequest request,
@@ -91,42 +95,74 @@ public class CardServiceImpl implements CardService {
     }
 
     @Override
+    @Transactional
     public CardResponse updateCard(Integer cardId,
                                    CardRequest request,
                                    Integer actorId) {
         Card card = findCard(cardId);
 
-        if (request.getTitle() != null) {
-            logActivity(cardId, actorId, "TITLE_CHANGED",
-                    card.getTitle(), request.getTitle());
-            card.setTitle(request.getTitle());
-        }
-        if (request.getDescription() != null)
+        updateFieldIfChanged(request.getTitle(), card.getTitle(), newValue -> {
+            logActivity(cardId, actorId, "TITLE_CHANGED", card.getTitle(), newValue);
+            card.setTitle(newValue);
+        });
+
+        if (request.getDescription() != null) {
             card.setDescription(request.getDescription());
-        if (request.getPriority() != null) {
-            logActivity(cardId, actorId, "PRIORITY_CHANGED",
-                    card.getPriority().name(), request.getPriority());
-            card.setPriority(Card.Priority
-                    .valueOf(request.getPriority()));
         }
-        if (request.getStatus() != null) {
-            logActivity(cardId, actorId, "STATUS_CHANGED",
-                    card.getStatus().name(), request.getStatus());
-            card.setStatus(Card.Status.valueOf(request.getStatus()));
-        }
-        if (request.getDueDate() != null) {
+
+        String currentPriorityStr = card.getPriority() != null ? card.getPriority().name() : null;
+        updateFieldIfChanged(request.getPriority(), currentPriorityStr, newValue -> {
+            logActivity(cardId, actorId, "PRIORITY_CHANGED", currentPriorityStr, newValue);
+            card.setPriority(Card.Priority.valueOf(newValue));
+        });
+
+        String currentStatusStr = card.getStatus() != null ? card.getStatus().name() : null;
+        updateFieldIfChanged(request.getStatus(), currentStatusStr, newValue -> {
+            logActivity(cardId, actorId, "STATUS_CHANGED", currentStatusStr, newValue);
+            card.setStatus(Card.Status.valueOf(newValue));
+        });
+
+        updateFieldIfChanged(request.getDueDate(), card.getDueDate(), newValue -> {
             logActivity(cardId, actorId, "DUE_DATE_CHANGED",
                     String.valueOf(card.getDueDate()),
-                    String.valueOf(request.getDueDate()));
-            card.setDueDate(request.getDueDate());
-        }
-        if (request.getStartDate() != null)
-            card.setStartDate(request.getStartDate());
-        if (request.getCoverColor() != null)
+                    String.valueOf(newValue));
+            card.setDueDate(newValue);
+
+            if (card.getAssigneeId() != null && !card.getAssigneeId().equals(actorId)) {
+                notificationPublisher.publish(NotificationEvent.builder()
+                        .recipientId(card.getAssigneeId())
+                        .actorId(actorId)
+                        .type("DUE_DATE")
+                        .title("Due date set on your card")
+                        .message("Due date for \"" + card.getTitle() +
+                                "\" has been set to " + newValue)
+                        .relatedId(cardId)
+                        .relatedType("CARD")
+                        .deepLinkUrl("/board/" + card.getBoardId())
+                        .build());
+            }
+        });
+
+        updateFieldIfChanged(request.getStartDate(), card.getStartDate(), newValue -> {
+            logActivity(cardId, actorId, "START_DATE_CHANGED",
+                    String.valueOf(card.getStartDate()),
+                    String.valueOf(newValue));
+            card.setStartDate(newValue);
+        });
+
+        if (request.getCoverColor() != null) {
             card.setCoverColor(request.getCoverColor());
+        }
 
         return toResponse(cardRepository.save(card));
     }
+    // Helper function for updateCard
+    private <T> void updateFieldIfChanged(T requestValue, T currentValue, java.util.function.Consumer<T> updateAction) {
+        if (requestValue != null && !requestValue.equals(currentValue)) {
+            updateAction.accept(requestValue);
+        }
+    }
+
 
     @Override
     @Transactional
@@ -136,23 +172,34 @@ public class CardServiceImpl implements CardService {
         Card card = findCard(cardId);
         String oldList = String.valueOf(card.getListId());
 
-        // Get position in target list
         int newPosition = request.getPosition() != null
                 ? request.getPosition()
                 : cardRepository
                   .findMaxPositionByListId(request.getTargetListId())
-                  .map(p -> p + 1)
-                  .orElse(1);
+                  .map(p -> p + 1).orElse(1);
 
         card.setListId(request.getTargetListId());
         card.setBoardId(request.getTargetBoardId());
         card.setPosition(newPosition);
-
         logActivity(cardId, actorId, "MOVED",
                 "list:" + oldList,
                 "list:" + request.getTargetListId());
+        CardResponse saved = toResponse(cardRepository.save(card));
 
-        return toResponse(cardRepository.save(card));
+        if (card.getCreatedById() != null &&
+                !card.getCreatedById().equals(actorId)) {
+            notificationPublisher.publish(NotificationEvent.builder()
+                    .recipientId(card.getCreatedById())
+                    .actorId(actorId)
+                    .type("MOVE")
+                    .title("A card was moved")
+                    .message("Card \"" + card.getTitle() + "\" was moved to a new list")
+                    .relatedId(cardId)
+                    .relatedType("CARD")
+                    .deepLinkUrl("/board/" + card.getBoardId())
+                    .build());
+        }
+        return saved;
     }
 
     @Override
@@ -231,9 +278,23 @@ public class CardServiceImpl implements CardService {
         String oldAssignee = String.valueOf(card.getAssigneeId());
         card.setAssigneeId(request.getAssigneeId());
         logActivity(cardId, actorId, "ASSIGNEE_CHANGED",
-                oldAssignee,
-                String.valueOf(request.getAssigneeId()));
-        return toResponse(cardRepository.save(card));
+                oldAssignee, String.valueOf(request.getAssigneeId()));
+        CardResponse saved = toResponse(cardRepository.save(card));
+
+        if (request.getAssigneeId() != null &&
+                !request.getAssigneeId().equals(actorId)) {
+            notificationPublisher.publish(NotificationEvent.builder()
+                    .recipientId(request.getAssigneeId())
+                    .actorId(actorId)
+                    .type("ASSIGNMENT")
+                    .title("You were assigned to a card")
+                    .message("You have been assigned to: " + card.getTitle())
+                    .relatedId(cardId)
+                    .relatedType("CARD")
+                    .deepLinkUrl("/board/" + card.getBoardId())
+                    .build());
+        }
+        return saved;
     }
 
     @Override
@@ -245,7 +306,23 @@ public class CardServiceImpl implements CardService {
         card.setPriority(Card.Priority.valueOf(request.getPriority()));
         logActivity(cardId, actorId, "PRIORITY_CHANGED",
                 oldPriority, request.getPriority());
-        return toResponse(cardRepository.save(card));
+        CardResponse saved = toResponse(cardRepository.save(card));
+
+        if (card.getAssigneeId() != null &&
+                !card.getAssigneeId().equals(actorId)) {
+            notificationPublisher.publish(NotificationEvent.builder()
+                    .recipientId(card.getAssigneeId())
+                    .actorId(actorId)
+                    .type("MENTION")
+                    .title("Card priority changed")
+                    .message("Priority of \"" + card.getTitle() +
+                            "\" changed to " + request.getPriority())
+                    .relatedId(cardId)
+                    .relatedType("CARD")
+                    .deepLinkUrl("/board/" + card.getBoardId())
+                    .build());
+        }
+        return saved;
     }
 
     @Override
@@ -258,6 +335,14 @@ public class CardServiceImpl implements CardService {
         logActivity(cardId, actorId, "STATUS_CHANGED",
                 oldStatus, request.getStatus());
         return toResponse(cardRepository.save(card));
+    }
+
+    @Override
+    public List<CardResponse> getAllCards() {
+        return cardRepository.findAll()
+                .stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -302,6 +387,19 @@ public class CardServiceImpl implements CardService {
                         .createdAt(a.getCreatedAt())
                         .build())
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public Map<String, Object> getCardOwnerInfo(Integer cardId) {
+        Card card = findCard(cardId);
+        return Map.of(
+                "cardId", card.getCardId(),
+                "createdById", card.getCreatedById(),
+                "assigneeId", card.getAssigneeId() != null
+                        ? card.getAssigneeId() : -1,
+                "title", card.getTitle(),
+                "boardId", card.getBoardId()
+        );
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
